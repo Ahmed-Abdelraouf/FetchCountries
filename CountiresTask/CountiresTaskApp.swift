@@ -11,7 +11,7 @@ import SwiftUI
 struct CountiresTaskApp: App {
     var body: some Scene {
         WindowGroup {
-            CountriesMainView()
+            CountriesMainView(viewModel: .init())
         }
     }
 }

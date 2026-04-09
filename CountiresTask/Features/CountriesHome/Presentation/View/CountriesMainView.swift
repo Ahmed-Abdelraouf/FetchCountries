@@ -8,66 +8,105 @@
 import SwiftUI
 
 struct CountriesMainView: View {
-    @StateObject private var viewModel: CountriesMainViewModel = .init()
+    @StateObject private var viewModel: CountriesMainViewModel
+    @State private var path = NavigationPath()
+    @State private var selectedCountry: Country?
+
+    init(
+        viewModel: CountriesMainViewModel,
+        path: NavigationPath = NavigationPath(),
+        selectedCountry: Country? = nil
+    ) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+        self.path = path
+        self.selectedCountry = selectedCountry
+    }
 
     var body: some View {
-        NavigationStack(path: $viewModel.path) {
-             countriesListView
-            .navigationTitle("Countries")
-            .navigationBarTitleDisplayMode(.automatic)
-            .showLoader(isLoading: $viewModel.isLoading)
-            .showSnackBar(
-                message: "You are offline, try to connect to fetch default country",
-                isVisible: Binding(
-                    get: { !viewModel.isOnline },
-                    set: { viewModel.isOnline = !$0 }
+        NavigationStack(path: $path) {
+            content
+                .navigationTitle("Countries")
+                .navigationBarTitleDisplayMode(.automatic)
+                .showLoader(isLoading: viewModel.isLoading)
+                .showSnackBar(
+                    message: "You are offline, try to connect to fetch default country",
+                    isVisible: $viewModel.showOfflineSnackBar
                 )
-            )
-            .onAppear(perform: {
-                viewModel.fetchAllCountries()
-            })
-            .toolbar {
-                if viewModel.isOnline {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            viewModel.navigateToCountrySearch()
-                        } label: {
-                            Image(systemName: "plus")
-                        }
+                .toolbar {
+                    toolbarContent
+                }
+                .navigationDestination(for: AppRoutes.self) { destination in
+                    switch destination {
+                    case .details:
+                        CountriesSearchView()
+                    }
+                }
+                .sheet(item: $selectedCountry) { country in
+                    CountryDetailsView(
+                        country: country,
+                        actionButton: detailsActionButton(for: country)
+                    ) {
+                        selectedCountry = nil
+                    }
+                    .presentationDetents([.medium, .large])
+                }
+                .task {
+                    viewModel.onAppear()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    viewModel.onAppDidBecomeActive()
+                }
+        }
+    }
+}
+
+private extension CountriesMainView {
+    var content: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                ForEach(viewModel.countries, id: \.id) { country in
+                    CountryCardView(
+                        country: country,
+                        actionButton: listItemActionButton(for: country)
+                    )
+                    .padding(.horizontal,.defaultSpacing(.p8))
+                    .onTapGesture {
+                        selectedCountry = country
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                viewModel.checkLocationPermission()
-            }
-            .navigationDestination(for: AppRoutes.self) { destination in
-                switch destination {
-                case .details:
-                    CountriesSearchView()
+        }
+    }
+
+    @ToolbarContentBuilder
+    var toolbarContent: some ToolbarContent {
+        if viewModel.isOnline {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    path.append(AppRoutes.details)
+                } label: {
+                    Image(systemName: "plus")
                 }
             }
-          
         }
-       
     }
 
-}
-
-#Preview {
-    CountriesMainView()
-}
-
-extension CountriesMainView {
-    private var countriesListView: some View {
-        List(viewModel.countries) { country in
-            CountryCardView(country: country, actionButton: listItemActionButton(deletableCountry: country))
-            .listRowSeparator(.hidden)
-        }
-        .listStyle(.plain)
-    }
-    private func listItemActionButton(deletableCountry: Country) -> some View {
+    func listItemActionButton(for country: Country) -> some View {
         CustomButton(foregroundColor: .red, imageName: "trash") {
-            viewModel.removeCountry(deletableCountry)
+            viewModel.removeCountry(country)
+        }
+    }
+
+    func detailsActionButton(for country: Country) -> some View {
+        CustomButton(
+            backgroundColor: .red,
+            label: "Remove from countries list",
+            height: 64,
+            cornerRadius: 12,
+            isFullWidth: true
+        ) {
+            viewModel.removeCountry(country)
+            selectedCountry = nil
         }
     }
 }

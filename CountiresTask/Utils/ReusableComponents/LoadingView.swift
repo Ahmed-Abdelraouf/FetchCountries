@@ -9,7 +9,7 @@ import SwiftUI
 
 
 struct ShowLoaderModifier: ViewModifier {
-    @Binding var isLoading: Bool
+     var isLoading: Bool
 
     func body(content: Content) -> some View {
         ZStack {
@@ -35,7 +35,7 @@ struct LoadingView: View {
     }
 }
 extension View {
-    func showLoader(isLoading: Binding<Bool>) -> some View {
+    func showLoader(isLoading: Bool) -> some View {
         self.modifier(ShowLoaderModifier(isLoading: isLoading))
     }
 }

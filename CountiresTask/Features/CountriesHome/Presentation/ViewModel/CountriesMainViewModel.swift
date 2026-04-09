@@ -6,151 +6,171 @@
 //
 
 import Foundation
+import Foundation
 import Combine
-import SwiftUI
-class CountriesMainViewModel: ObservableObject {
-    @Published var countries: [Country] = []
-    @Published var isLoading: Bool = false
-    @Published var isOnline: Bool = true
-    @Published var showOfflineSnackBar: Bool = false
-    @Published  var path = NavigationPath()
-    @Published private var locationPermissionStatus: AuthorizationStatus = .notDetermined
+
+@MainActor
+final class CountriesMainViewModel: ObservableObject {
+    @Published private(set) var countries: [Country] = []
+    @Published private(set) var isLoading = false
+    @Published private(set) var isOnline = true
+    @Published var showOfflineSnackBar = false
+
     private let permissionAuthenticator: PermissionsAuthenticatorProtocol
     private let searchCountriesUseCase: SearchCountriesUseCaseProtocol
     private let countriesPersistenceUseCase: CountryPersistenceUseCaseProtocol
-    private let locationManager: UserLocationManager
-    private let networkMonitor: NetworkMonitorContract
-    private var cancellables: Set<AnyCancellable> = []
-    private var defaultCountryName: String = "Egypt"
-    
-    
+    private let locationManager: UserLocationManagerProtocol
+    private let networkMonitor: NetworkMonitorObservableContract
+
+    private var cancellables = Set<AnyCancellable>()
+    private var locationPermissionStatus: AuthorizationStatus = .notDetermined
+    private var defaultCountryName = "Egypt"
+    private var hasLoadedInitially = false
+
     init(
         permissionAuthenticator: PermissionsAuthenticatorProtocol = PermissionsAutheticator.locationPermission,
-        locationManager: UserLocationManager = UserLocationManager(),
+        locationManager: UserLocationManagerProtocol = UserLocationManager(),
         searchCountriesUseCase: SearchCountriesUseCaseProtocol = SearchCountriesUseCase(),
         countriesPersistenceUseCase: CountryPersistenceUseCaseProtocol = CountryPersistenceUseCase(),
-        networkMonitor: NetworkMonitorContract = NetworkMonitor.shared
+        networkMonitor: NetworkMonitorObservableContract = NetworkMonitor.shared
     ) {
         self.permissionAuthenticator = permissionAuthenticator
         self.locationManager = locationManager
         self.searchCountriesUseCase = searchCountriesUseCase
         self.countriesPersistenceUseCase = countriesPersistenceUseCase
         self.networkMonitor = networkMonitor
-        checkLocationPermission()
+
         observeNetworkChanges()
     }
-    
-     func checkLocationPermission() {
-        permissionAuthenticator.requestAuthorizationStatus {[weak self] authorizationStatus in
-            self?.getUserLocationBasedOnLocationPermission(isAuthorized: authorizationStatus)
+
+    func onAppear() {
+        guard !hasLoadedInitially else {
+            fetchAllCountries()
+            return }
+        hasLoadedInitially = true
+        checkLocationPermission()
+    }
+
+    func onAppDidBecomeActive() {
+        checkLocationPermission()
+    }
+
+    func removeCountry(_ country: Country) {
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+
+            do {
+                try await countriesPersistenceUseCase.executeDelete(country: country)
+                countries.removeAll { $0 == country }
+            } catch {
+            }
         }
     }
-    private func getUserLocationBasedOnLocationPermission(isAuthorized: AuthorizationStatus) {
-        guard locationPermissionStatus != isAuthorized else { return }
-        locationPermissionStatus = isAuthorized
-        if locationPermissionStatus == .authorized && isOnline {
+
+    func refreshCountries() {
+        fetchAllCountries()
+    }
+
+    private func checkLocationPermission() {
+        permissionAuthenticator.requestAuthorizationStatus { [weak self] authorizationStatus in
+            guard let self else { return }
+
+            Task { @MainActor in
+                self.handleLocationPermissionStatus(authorizationStatus)
+            }
+        }
+    }
+
+    private func handleLocationPermissionStatus(_ status: AuthorizationStatus) {
+        guard locationPermissionStatus != status || !hasLoadedInitially else {
+            fetchAllCountries()
+            return
+        }
+
+        locationPermissionStatus = status
+
+        if status == .authorized, isOnline {
             setUserCountryName()
         } else {
+            defaultCountryName = "Egypt"
             fetchAllCountries()
         }
     }
+
     private func setUserCountryName() {
         isLoading = true
         locationManager.requestLocation()
-        locationManager.countryName
+
+        locationManager.countryNamePublisher
             .receive(on: RunLoop.main)
-            .sink {[weak self] countryName in
-                self?.fetchAllCountries()
-            }.store(in: &cancellables)
+            .prefix(1)
+            .sink { [weak self] countryName in
+                guard let self else { return }
+                self.defaultCountryName = countryName
+                self.fetchAllCountries()
+            }
+            .store(in: &cancellables)
     }
+
     private func observeNetworkChanges() {
-        if let monitor = networkMonitor as? NetworkMonitor {
-            monitor.$isConnected
-                .receive(on: RunLoop.main)
-                .dropFirst()
-                .sink { [weak self] isConnected in
-                    self?.isOnline = isConnected
-                }
-                .store(in: &cancellables)
-        }
-    }
-    func removeCountry(_ country: Country) {
-        self.isLoading = true
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
+        networkMonitor.connectionPublisher
+            .receive(on: RunLoop.main)
+            .removeDuplicates()
+            .sink { [weak self] isConnected in
+                guard let self else { return }
+                self.isOnline = isConnected
             }
-            do {
-                let _ = try await  countriesPersistenceUseCase.executeDelete(country:country)
-                self.countries.removeAll(where: {$0 == country})
-                self.isLoading = false
-            } catch {
-                self.isLoading = false
-            }
-        }
+            .store(in: &cancellables)
     }
-    
-    func saveCountry(_ country: Country) {
+
+    private func fetchAllCountries() {
         isLoading = true
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
-            }
-            do {
-                let _ = try await   countriesPersistenceUseCase.executeSave(country: country)
-                self.isLoading = false
-            } catch {
-                self.isLoading = false
-            }
-        }
-    }
-    
-    func fetchAllCountries() {
-        isLoading = true
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
-            }
+
+        Task {
+            defer { isLoading = false }
+
             do {
                 let countries = try await countriesPersistenceUseCase.executeFetchCountries()
-                self.handleCountriesResponse(countries)
-                self.isLoading = false
+                handleCountriesResponse(countries)
             } catch {
-                self.isLoading = false
             }
         }
     }
+
     private func handleCountriesResponse(_ countries: [Country]) {
-        guard !countries.isEmpty, countries.contains(where: {$0.name.common == defaultCountryName}) else {
+        guard !countries.isEmpty,
+              countries.contains(where: { $0.name.common == defaultCountryName }) else {
             fetchDefaultCountry()
             return
         }
+
         self.countries = countries
     }
+
     private func fetchDefaultCountry() {
         guard isOnline else {
             showOfflineSnackBar = true
             return
         }
+
         isLoading = true
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
-            }
+
+        Task {
+            defer { isLoading = false }
+
             do {
-                let data = try await  searchCountriesUseCase.execute(countryName: defaultCountryName)
-                self.isLoading = false
-                if let firstCountry = data.first(where: {$0.name.common == self.defaultCountryName}) {
-                    self.saveCountry(firstCountry)
-                    fetchAllCountries()
+                let data = try await searchCountriesUseCase.execute(countryName: defaultCountryName)
+
+                guard let firstCountry = data.first(where: { $0.name.common == defaultCountryName }) else {
+                    return
                 }
+
+                try await countriesPersistenceUseCase.executeSave(country: firstCountry)
+                let countries = try await countriesPersistenceUseCase.executeFetchCountries()
+                handleCountriesResponse(countries)
             } catch {
-                self.isLoading = false
             }
         }
-    }
-    
-    func navigateToCountrySearch() {
-        self.path.append(AppRoutes.details)
     }
 }

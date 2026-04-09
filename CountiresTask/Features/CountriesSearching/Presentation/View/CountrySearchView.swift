@@ -17,7 +17,7 @@ struct CountriesSearchView: View {
             Spacer()
         }
         .padding()
-        .showLoader(isLoading: $viewModel.isLoading)
+        .showLoader(isLoading: viewModel.isLoading)
         .showSnackBar(message: "You can only save up to 5 countries.", isVisible: $viewModel.showReachedLimitView)
         .showSnackBar(
             message: "You are offline, try to reconnect to fetch countries",
@@ -60,6 +60,7 @@ struct CountriesSearchView: View {
             LazyVStack {
                 ForEach(viewModel.countries) { country in
                     CountryCardView(country: country, actionButton: listItemActionButton(savableCountry: country))
+                        .padding(.horizontal,.defaultSpacing(.p8))
                 }
             }
         }

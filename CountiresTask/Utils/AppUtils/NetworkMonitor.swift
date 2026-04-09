@@ -8,36 +8,31 @@
 import Network
 import Combine
 
-protocol NetworkMonitorContract {
+protocol NetworkMonitorObservableContract {
     var isConnected: Bool { get }
+    var connectionPublisher: AnyPublisher<Bool, Never> { get }
 }
+import Network
+import Combine
 
-enum NetworkState {
-    case online
-    case offline
-}
+final class NetworkMonitor: ObservableObject, NetworkMonitorObservableContract {
+    static let shared = NetworkMonitor()
 
-class NetworkMonitor: ObservableObject, NetworkMonitorContract {
-    static let shared: NetworkMonitor = .init()
-    let monitor = NWPathMonitor()
-    let queue = DispatchQueue(label: "NetworkMonitor")
-    @Published var isConnected = true
-    
-    private var state: NetworkState = .online
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "NetworkMonitor")
+
+    @Published private(set) var isConnected = true
+    var connectionPublisher: AnyPublisher<Bool, Never> {
+        $isConnected.eraseToAnyPublisher()
+    }
+
     private init() {
-        monitor.pathUpdateHandler = { path in
-            DispatchQueue.main.async { [weak self] in
-                let isNetworkConnected = path.status == .satisfied
-                self?.isConnected = isNetworkConnected
-                let network: NetworkState = isNetworkConnected ? .online : .offline
-                self?.didChangeNetworkReachability(network)
+        monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.isConnected = (path.status == .satisfied)
             }
         }
+
         monitor.start(queue: queue)
-    }
-    
-    private func didChangeNetworkReachability(_ network: NetworkState) {
-        guard state != network else { return }
-        state = network
     }
 }

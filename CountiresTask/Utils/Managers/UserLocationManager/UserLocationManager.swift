@@ -8,6 +8,10 @@
 import Combine
 import CoreLocation
 
+protocol UserLocationManagerProtocol {
+    var countryNamePublisher: AnyPublisher<String, Never> { get }
+    func requestLocation()
+}
 class UserLocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private var locationManager = CLLocationManager()
     let countryName = PassthroughSubject<String, Never>()
@@ -43,5 +47,11 @@ class UserLocationManager: NSObject, ObservableObject, CLLocationManagerDelegate
                 self.countryName.send(country)
             }
         }
+    }
+}
+
+extension UserLocationManager: UserLocationManagerProtocol {
+    var countryNamePublisher: AnyPublisher<String, Never> {
+        countryName.eraseToAnyPublisher()
     }
 }

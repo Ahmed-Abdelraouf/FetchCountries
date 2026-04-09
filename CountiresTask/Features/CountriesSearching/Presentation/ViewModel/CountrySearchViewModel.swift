@@ -20,13 +20,13 @@ final class CountriesSearchViewModel: ObservableObject {
     
     private let searchCountriesUseCase: SearchCountriesUseCaseProtocol
     private let countryPersistenceUseCase: CountryPersistenceUseCaseProtocol
-    private let networkMonitor: NetworkMonitorContract
+    private let networkMonitor: NetworkMonitorObservableContract
     private var cancellables = Set<AnyCancellable>()
 
     init(
         searchCountriesUseCase: SearchCountriesUseCaseProtocol = SearchCountriesUseCase(),
         countryPersistenceUseCase: CountryPersistenceUseCaseProtocol = CountryPersistenceUseCase(),
-        networkMonitor: NetworkMonitorContract = NetworkMonitor.shared
+        networkMonitor: NetworkMonitorObservableContract = NetworkMonitor.shared
     ) {
         self.searchCountriesUseCase = searchCountriesUseCase
         self.networkMonitor = networkMonitor
@@ -46,7 +46,9 @@ final class CountriesSearchViewModel: ObservableObject {
     }
     
     func searchCountries(for name: String) {
-        guard !name.isEmpty else { return }
+        guard !name.isEmpty else {
+            self.countries.removeAll()
+            return }
         isLoading = true
         showEmptyResultsState = false
         Task { @MainActor [weak self] in
