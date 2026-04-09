@@ -9,7 +9,7 @@ import Foundation
 import Foundation
 import Combine
 
-@MainActor
+
 final class CountriesMainViewModel: ObservableObject {
     @Published private(set) var countries: [Country] = []
     @Published private(set) var isLoading = false
@@ -24,7 +24,7 @@ final class CountriesMainViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var locationPermissionStatus: AuthorizationStatus = .notDetermined
-    private var defaultCountryName = "Egypt"
+    private var defaultCountryName = ""
     private var hasLoadedInitially = false
 
     init(
@@ -101,10 +101,8 @@ final class CountriesMainViewModel: ObservableObject {
     private func setUserCountryName() {
         isLoading = true
         locationManager.requestLocation()
-
         locationManager.countryNamePublisher
             .receive(on: RunLoop.main)
-            .prefix(1)
             .sink { [weak self] countryName in
                 guard let self else { return }
                 self.defaultCountryName = countryName
