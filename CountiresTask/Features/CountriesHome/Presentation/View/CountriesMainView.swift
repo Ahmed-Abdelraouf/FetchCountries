@@ -19,7 +19,7 @@ struct CountriesMainView: View {
                 if viewModel.isOnline {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
-                            
+                            viewModel.navigateToCountrySearch()
                         } label: {
                             Image(systemName: "plus")
                         }
@@ -29,12 +29,7 @@ struct CountriesMainView: View {
             .navigationDestination(for: AppRoutes.self) { destination in
                 switch destination {
                 case .details:
-                    VStack {
-                        Spacer()
-                        Text("hellooApps")
-                        Spacer()
-                    }
-                    .background(.red)
+                    CountriesSearchView()
                 }
             }
           

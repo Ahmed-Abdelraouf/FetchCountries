@@ -22,5 +22,5 @@ struct ImageLoaderView: View {
     }
 }
 #Preview {
-    ImageLoaderView(imageURL: "https://flagcdn.com/eg.svg")
+    ImageLoaderView(imageURL: "https://flagcdn.com/w320/eg.png")
 }

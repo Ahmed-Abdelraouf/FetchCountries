@@ -32,5 +32,5 @@ struct Currency: Codable {
 }
 
 struct Flags: Codable {
-    let svg: String?
+    let png: String?
 }

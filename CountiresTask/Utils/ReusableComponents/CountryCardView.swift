@@ -33,7 +33,7 @@ struct CountryCardView<ActionButton: View>: View {
     }
     
     private var flagImageView: some View {
-        ImageLoaderView(imageURL: country.flags?.svg ?? "")
+        ImageLoaderView(imageURL: country.flags?.png ?? "")
         .frame(width: 80, height: 50)
         .clipShape(RoundedRectangle(cornerRadius: .defaultSpacing(.p8)))
     }
@@ -51,7 +51,7 @@ struct CountryCardView<ActionButton: View>: View {
             ),
             currencies: ["EGP" : Currency(name: "Egyptian pound", symbol: "£")],
             capital: ["Cairo"],
-            flags: .init(svg: "https://flagcdn.com/eg.svg"),
+            flags: .init(png: "https://flagcdn.com/eg.svg"),
             cca3: "812"
         ),
         actionButton:  CustomButton(foregroundColor: .red, imageName: "trash") {
