@@ -33,27 +33,19 @@ struct CountriesSearchView: View {
         )
         .overlay((viewModel.showEmptyResultsState && !viewModel.searchText.isEmpty) ? emptySearchResultsView : nil)
         .overlay(viewModel.searchText.isEmpty ? emptySearchTextView : nil)
-//        .sheet(item: $selectedCountry) { country in
-//            detailsView(country: country)
-//            .presentationDetents([.medium, .large])
-//        }
-//        .onChange(of: viewModel.shouldRefreshFromCache) { _, newValue in
-//            if newValue {
-//                self.shouldRefresh = newValue
-//                viewModel.shouldRefreshFromCache = false
-//            }
-//        }
-//        .onChange(of: searchText) { _, newSearchText in
-//            viewModel.searchCountries(for: newSearchText)
-//        }
+        .sheet(item: $viewModel.selectedCountry) { country in
+            detailsView(country: country)
+            .presentationDetents([.medium, .large])
+        }
+
     }
     
-//    @ViewBuilder
-//    private func detailsView(country: Country) -> some View {
-//        CountryDetailsView(country: country, actionButton: detailsActionButton) {
-//            dismissDetailsSheet()
-//        }
-//    }
+    @ViewBuilder
+    private func detailsView(country: Country) -> some View {
+        CountryDetailsView(country: country, actionButton: detailsActionButton) {
+            viewModel.dismissDetailsSheet()
+        }
+    }
     
     private var searchView: some View {
         SearchBarView(isSearchButtonDisabled: !viewModel.isOnline, placeholder: "Search by country name") { searchText in
@@ -64,12 +56,15 @@ struct CountriesSearchView: View {
     }
     
     private var countriesListView: some View {
-            List(viewModel.countries) { country in
-                CountryCardView(country: country, actionButton: listItemActionButton(savableCountry: country))
-                .listRowSeparator(.hidden)
+        ScrollView {
+            LazyVStack {
+                ForEach(viewModel.countries) { country in
+                    CountryCardView(country: country, actionButton: listItemActionButton(savableCountry: country))
+                }
             }
-            .listStyle(.plain)
-            .hiddenIf(viewModel.showEmptyResultsState)
+        }
+        .hiddenIf(viewModel.showEmptyResultsState)
+        .scrollIndicators(.hidden)
         
     }
     
@@ -88,15 +83,15 @@ struct CountriesSearchView: View {
     @ViewBuilder
     private func listItemActionButton(savableCountry: Country) -> some View {
         CustomButton(foregroundColor: .blue, imageName: "plus.circle.fill") {
-       //     viewModel.saveCountry(savableCountry)
+            viewModel.saveCountry(savableCountry)
         }
     }
     
     private var detailsActionButton: some View {
         CustomButton(backgroundColor: .blue, label: "Add to main countries list", height: 64, cornerRadius: .defaultSpacing(.p12), isFullWidth: true) {
-//            guard let selectedCountry else { return }
-//         //   viewModel.saveCountry(selectedCountry)
-//            dismissDetailsSheet()
+            guard let selectedCountry = viewModel.selectedCountry else { return }
+            viewModel.saveCountry(selectedCountry)
+            viewModel.dismissDetailsSheet()
         }
     }
 

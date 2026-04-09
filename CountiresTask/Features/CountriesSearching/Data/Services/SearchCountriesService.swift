@@ -1,11 +1,11 @@
 //
 //  SearchCountriesService.swift
-//  GlobeCurrency
+//  CountiresTask
 //
 //  Created by Ahmed Abdelraouf on 09/04/2026.
 //
 
-import Combine
+import Foundation
 
 final class SearchCountriesService: SearchCountriesServiceProtocol{
     
